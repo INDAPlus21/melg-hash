@@ -11,8 +11,7 @@ import (
 	"strings"
 )
 
-// My hashmap is specifically for strings so it isn't nestable therefore I use the inbuilt map to support multiple tables. I could remove it and only support one table instead
-var database = make(map[string]*HashTable)
+var database = create_table()
 var default_database = "default"
 
 func main() {
@@ -20,8 +19,8 @@ func main() {
 	load()
 
 	// Add default table
-	if len(database) == 0 {
-		database[default_database] = create_table()
+	if database.count == 0 {
+		insert_value_table(database, "default", create_table())
 	}
 
 	get_input()
@@ -70,14 +69,15 @@ func command_add(values []string) {
 		name := default_database
 		if len(values) == 4 {
 			name = values[3]
-			_, ok := database[name]
+			_, ok := get_value_table(database, name)
 			if !ok {
 				fmt.Println("Invalid table name, there is no table with name", name)
 				return
 			}
 		}
 
-		insert_value_table(database[name], values[1], values[2])
+		table, _ := get_value_table(database, name)
+		insert_value_table(table.(*HashTable), values[1], values[2])
 		fmt.Println("Sucessfully added entry with key", values[1], "and value", values[2])
 	}
 }
@@ -89,15 +89,16 @@ func command_remove(values []string) {
 		name := default_database
 		if len(values) == 3 {
 			name = values[2]
-			_, ok := database[name]
+			_, ok := get_value_table(database, name)
 			if !ok {
 				fmt.Println("Invalid table name, there is no table with name", name)
 				return
 			}
 		}
 
-		_, ok := get_value_table(database[name], values[1])
-		delete_value_table(database[name], values[1])
+		table, _ := get_value_table(database, name)
+		_, ok := get_value_table(table.(*HashTable), values[1])
+		delete_value_table(table.(*HashTable), values[1])
 		if ok {
 			fmt.Println("Sucessfully removed entry with key", values[1], "from database", name)
 		} else {
@@ -113,14 +114,15 @@ func command_get(values []string) {
 		name := default_database
 		if len(values) == 3 {
 			name = values[2]
-			_, ok := database[name]
+			_, ok := get_value_table(database, name)
 			if !ok {
 				fmt.Println("Invalid table name, there is no table with name", name)
 				return
 			}
 		}
 
-		value, ok := get_value_table(database[name], values[1])
+		table, _ := get_value_table(database, name)
+		value, ok := get_value_table(table.(*HashTable), values[1])
 		if ok {
 			fmt.Println("Key", values[1], "was found in database", name, "with value", value)
 		} else {
@@ -136,7 +138,7 @@ func command_list(values []string) {
 		name := default_database
 		if len(values) == 2 {
 			name = values[1]
-			_, ok := database[name]
+			_, ok := get_value_table(database, name)
 			if !ok {
 				fmt.Println("Invalid table name, there is no table with name", name)
 				return
@@ -146,8 +148,9 @@ func command_list(values []string) {
 		fmt.Println("Database key and values:")
 
 		// Loop through all hashes and their values
-		for _, key_value := range get_all_table(database[name]) {
-			fmt.Println(key_value.key + ":" + key_value.value)
+		table, _ := get_value_table(database, name)
+		for _, key_value := range get_all_table(table.(*HashTable)) {
+			fmt.Println(key_value.key + ":" + key_value.value.(string))
 		}
 	}
 }
@@ -156,12 +159,12 @@ func command_add_table(values []string) {
 	if len(values) != 2 {
 		fmt.Println("Invalid input, format is: ADDTABLE <NAME>")
 	} else {
-		_, ok := database[values[1]]
+		_, ok := get_value_table(database, values[1])
 
 		if ok {
 			fmt.Println("Database with name", values[1], "already exists")
 		} else {
-			database[values[1]] = create_table()
+			insert_value_table(database, values[1], create_table())
 			fmt.Println("Successfully added database with name", values[1])
 		}
 	}
@@ -169,8 +172,8 @@ func command_add_table(values []string) {
 
 func command_list_tables() {
 	fmt.Println("List of tables:")
-	for key := range database {
-		fmt.Println(key)
+	for _, key := range get_all_table(database) {
+		fmt.Println(key.key)
 	}
 }
 
@@ -206,7 +209,7 @@ func load() {
 
 		// Load data line for line
 		scanner := bufio.NewScanner(file)
-		database[file_name] = create_table()
+		insert_value_table(database, file_name, create_table())
 
 		for scanner.Scan() {
 			values := strings.Split(scanner.Text(), ":")
@@ -215,7 +218,8 @@ func load() {
 				continue
 			}
 
-			insert_value_table(database[file_name], values[0], values[1])
+			table, _ := get_value_table(database, file_name)
+			insert_value_table(table.(*HashTable), values[0], values[1])
 		}
 
 		file.Close()
@@ -224,10 +228,10 @@ func load() {
 
 func save() {
 	// Create files for all tables
-	for table_name, table := range database {
+	for _, table_key_value := range get_all_table(database) {
 		// Create (override) file
 		directory, _ := os.Getwd()
-		file_location := directory + "\\" + table_name + ".data"
+		file_location := directory + "\\" + table_key_value.key + ".data"
 		file, err := os.Create(file_location)
 
 		if err != nil {
@@ -236,8 +240,8 @@ func save() {
 
 		// Write all database data
 		writer := bufio.NewWriter(file)
-		for _, key_value := range get_all_table(table) {
-			writer.WriteString(key_value.key + ":" + key_value.value + "\n")
+		for _, key_value := range get_all_table(table_key_value.value.(*HashTable)) {
+			writer.WriteString(key_value.key + ":" + key_value.value.(string) + "\n")
 		}
 
 		writer.Flush()

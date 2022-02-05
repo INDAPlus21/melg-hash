@@ -12,7 +12,7 @@ type HashTable struct {
 
 type KeyValuePair struct {
 	key   string
-	value string
+	value interface{}
 }
 
 // Source: https://stackoverflow.com/questions/7666509/hash-function-for-string
@@ -37,7 +37,7 @@ func create_table_capacity(capacity int16) *HashTable {
 	return &hash_table
 }
 
-func insert_value_table(hash_table *HashTable, key string, value string) {
+func insert_value_table(hash_table *HashTable, key string, value interface{}) {
 	hash := get_hash(hash_table, key)
 
 	// Create new linked list
@@ -75,13 +75,13 @@ func delete_value_table(hash_table *HashTable, key string) {
 	}
 }
 
-func get_value_table(hash_table *HashTable, key string) (string, bool) {
+func get_value_table(hash_table *HashTable, key string) (interface{}, bool) {
 	hash := get_hash(hash_table, key)
 	list := hash_table.values[hash]
 
 	// Find value in list
 	for element := list.Front(); element != nil; element = element.Next() {
-		if element.Value.(KeyValuePair).key == key {
+		if element.Value != nil && element.Value.(KeyValuePair).key == key {
 			return element.Value.(KeyValuePair).value, true
 		}
 	}
